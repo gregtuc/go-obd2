@@ -27,25 +27,34 @@ func GetCoolantTemp() {
 	ReadAndLog(port)
 
 	// Wrap the command sending and response reading in a loop
+	// Create a channel to signal the end of the 30-second period
+	stop := time.After(30 * time.Second)
+
 	for {
-		// Send the "01 05" command to request the coolant temperature
-		if _, err = port.Write([]byte("01 05\r")); err != nil {
-			log.Fatal(err)
+		select {
+		case <-stop:
+			fmt.Println("Completed 30 seconds of data collection.")
+			return // Exit the function, which will close the port due to defer
+		default:
+			// Send the "01 05" command to request the coolant temperature
+			if _, err = port.Write([]byte("01 05\r")); err != nil {
+				log.Fatal(err)
+			}
+
+			// Read and log the response from the device
+			response := ReadAndLog(port)
+			if len(response) < 7 {
+				log.Fatal("Invalid response length")
+			}
+
+			// Calculate the coolant temperature from the response
+			tempByte := response[6]
+			tempCelsius := int(tempByte) - 40
+			// Print the coolant temperature
+			fmt.Printf("Coolant Temperature: %d°C\n", tempCelsius)
+
+			// Delay before sending the next request (e.g., 2 seconds)
+			time.Sleep(2 * time.Second)
 		}
-
-		// Read and log the response from the device
-		response := ReadAndLog(port)
-		if len(response) < 7 {
-			log.Fatal("Invalid response length")
-		}
-
-		// Calculate the coolant temperature from the response
-		tempByte := response[6]
-		tempCelsius := int(tempByte) - 40
-		// Print the coolant temperature
-		fmt.Printf("Coolant Temperature: %d°C\n", tempCelsius)
-
-		// Delay before sending the next request (e.g., 2 seconds)
-		time.Sleep(2 * time.Second)
 	}
 }
